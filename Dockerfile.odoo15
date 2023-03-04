@@ -1,0 +1,45 @@
+# Use the official Odoo image as a parent image
+FROM odoo:15
+
+ARG GIT_USERNAME
+ARG GIT_PASSWORD
+ARG GIT_URL
+ARG CLIENT_REPOSITORY
+
+USER root
+# Set environment variables
+RUN echo 'root:odoo' | chpasswd
+ENV POSTGRES_USER=odoo \
+    POSTGRES_PASSWORD=odoo
+
+# Create a directory for custom addons
+RUN chmod -R a+rw /mnt/extra-addons
+# RUN apt-get install sudo
+RUN apt-get update && \
+    apt-get install -y git
+
+RUN apt update && \
+    apt install python3-pip
+
+RUN pip install transbank-sdk && \
+    pip install urllib3 && \
+    pip install suds-jurko
+USER odoo
+
+# Copy the custom Odoo configuration file into the container
+COPY odoo-server.conf /etc/odoo/odoo.conf
+
+# Set up entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+
+RUN  git clone https://$GIT_USERNAME:$GIT_PASSWORD@$GIT_URL /mnt/extra-addons/$CLIENT_REPOSITORY
+RUN git clone -b 15.0 https://github.com/OCA/web.git /mnt/extra-addons/OCA-WEB/
+RUN pwd
+RUN cd /mnt/extra-addons/$CLIENT_REPOSITORY && git pull
+
+# Expose Odoo and HTTP ports
+EXPOSE 8069
+
+# Set the default command to execute
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["odoo", "-i", "base"]

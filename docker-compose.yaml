@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+  # Configuraci  n del servicio de la base de datos Postgres
+  db:
+    image: postgres:14  # Imagen oficial de Postgres en su versi  n 14
+    user: root
+    environment:  # Variables de entorno para la base de datos Postgres
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo  # Nombre de usuario de la base de datos
+      POSTGRES_PASSWORD: odoo  # Contrase  a del usuario de la base de datos
+
+    volumes:  # Volumen para almacenar datos de la base de datos de forma persistente
+      - odoo-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:  # Asignaci  n a la red personalizada "odoo-network"
+      - odoo-network
+    hostname: db
+    container_name: db
+
+  # Configuraci  n del servicio web Odoo
+  web:
+    build:   # Construye la imagen de Odoo utilizando el Dockerfile en el directorio actual
+      context: .
+      args:
+        GIT_USERNAME: ${GIT_USERNAME}
+        GIT_PASSWORD: ${GIT_PASSWORD}
+        GIT_URL: ${GIT_URL}
+        CLIENT_REPOSITORY: ${CLIENT_REPOSITORY}
+    depends_on:
+      - db  # Dependencia del servicio de la base de datos
+    ports:  # Puertos expuestos por el servicio web
+      - "8069:8069"
+    volumes:  # Volumenes necesarios para el servicio web
+      - ./odoo-server.conf:/etc/odoo/odoo.conf  # Configuraci  n personalizada de Odoo
+      - ./extra-addons:/mnt/extra-addons  # Volumen para almacenar addons personalizados
+      - odoo-web-data:/var/lib/odoo
+    command: odoo --db_host=db -i base
+    # environment:
+    #   ODOO_DATABASE_HOST: db
+    #   ODOO_DATABASE_PORT: 5432
+    #   ODOO_DATABASE_USER: odoo
+    #   ODOO_DATABASE_PASSWORD: odoo
+    #   ODOO_LONGPOLLING_PORT: 8072
+    networks:  # Asignaci  n a la red personalizada "odoo-network"
+      - odoo-network
+    stdin_open: true
+    tty: true
+  # Configuraci  n del servicio Nginx
+  nginx:
+    image: nginx:latest  # Imagen oficial de Nginx en su   ltima versi  n
+    volumes:  # Volumen necesario para el servicio Nginx
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf  # Configuraci  n personalizada de Nginx
+      - ./nginx/odoo.conf:/etc/nginx/conf.d/odoo.conf  # Configuraci  n personalizada de Nginx
+    ports:  # Puerto expuesto por el servicio Nginx
+      - "80:80"
+      - "443:443"
+    depends_on:  # Dependencia del servicio web Odoo
+      - web
+    networks:  # Asignaci  n a la red personalizada "odoo-network"
+      - odoo-network
+    environment:
+      - ODOO_SERVER_NAME=${ODOO_SERVER_NAME}
+  # Configuraci  n del servicio Certbot
+  certbot:
+    image: certbot/certbot:latest  # Imagen oficial de Certbot en su   ltima versi  n
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt  # Volumen para almacenar el certificado y las claves de $
+      - ./certbot-logs:/var/log/letsencrypt  # Volumen para almacenar los logs de Certbot
+    command: certonly --webroot --webroot-path=/var/www/html --email ${lets_encrypt_email} --agr$
+    # Reemplaza 'your-email@example.com' con tu direcci  n de correo electr  nico y 'your-domain$
+    # Certbot us
+
+volumes:  # Definici  n de los vol  menes
+  odoo-db-data:  # Volumen para los datos de la base de datos
+  odoo-web-data:  # Volumen para los datos de Odoo
+
+networks:  # Definici  n de la red personalizada "odoo-network"
+  odoo-network:  # Nombre de la red personalizada
